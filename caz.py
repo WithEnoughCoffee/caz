@@ -120,6 +120,7 @@ def run():
             # Ctrl+C or Ctrl+D — graceful exit
             print()
             print(format_response(get_farewell()))
+            engine.shutdown()
             break
 
         # Skip empty input
@@ -132,6 +133,7 @@ def run():
         # Check for exit signal
         if response == "__EXIT__":
             print(format_response(get_farewell()))
+            engine.shutdown()
             break
 
         # Display Caz's response

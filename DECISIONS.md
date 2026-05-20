@@ -165,6 +165,47 @@ How aggressively should Caz minimize external packages?
 
 ---
 
+## ADR-006: Remote Model Bootstrap — Together AI with stdlib HTTP
+
+**Date:** 2026-05-20  
+**Status:** Accepted  
+
+### Context
+Caz needs a "brain" to respond intelligently. Local models (Ollama) come in Phase 2. For Phase 1, we need a remote API to bootstrap. How do we connect to it?
+
+### Options Considered
+| Option | Pros | Cons |
+|--------|------|------|
+| `openai` Python SDK | Easy, handles retries/streaming | Heavy dep (pulls in httpx, pydantic, etc.) |
+| `requests` library | Simple API, well-known | External dep |
+| `httpx` | Modern, async-capable | External dep |
+| Python `http.client` (stdlib) | Zero deps, full control, educational | More verbose, no retries built-in |
+
+### Decision
+**Python `http.client`** — stdlib only. The API call is simple (POST JSON, get JSON back). We don't need retries, streaming, or async yet. This teaches how HTTP actually works under the hood.
+
+**Provider: Together AI** because:
+- Hosts OLMo 2 (our primary truly open model)
+- OpenAI-compatible API (same interface we'll use for Ollama)
+- Free tier available for getting started
+- Supports the 32B instruct variant
+
+### Trade-off
+More verbose code than `requests`. No automatic retries. No streaming (responses come all at once). These become important in Phase 2+ when we'll evaluate whether to add a minimal HTTP library.
+
+### What We'd Revisit
+- **Phase 2**: When switching to Ollama, same API format works
+- **Phase 3**: If streaming becomes needed, may add SSE parsing (still stdlib-possible)
+
+### References
+- Together AI API docs: https://docs.together.ai/reference/chat-completions-1
+- Together AI models list: https://docs.together.ai/docs/inference-models
+- OLMo 2 on Together: https://api.together.xyz/models/allenai/OLMo-2-0325-32B-Instruct
+- Python http.client docs: https://docs.python.org/3/library/http.client.html
+- OpenAI API spec (de facto standard): https://platform.openai.com/docs/api-reference/chat
+
+---
+
 ## Template for New Decisions
 
 ```markdown

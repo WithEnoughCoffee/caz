@@ -16,8 +16,8 @@ energy_mode = "efficient"   # efficient | balanced | performance
 [models.remote]
 # Temporary bootstrap only — will be removed in Phase 5
 # API key MUST be set via environment variable CAZ_API_KEY
-endpoint = ""
-model = ""
+endpoint = "api.together.xyz"
+model = "allenai/OLMo-2-0325-32B-Instruct"
 
 [memory]
 enabled = true
