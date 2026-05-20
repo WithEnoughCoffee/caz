@@ -1,29 +1,33 @@
 """
-Caz — Model Client (Together AI Bootstrap)
+Caz — Model Client (Ollama Local)
 
-Handles communication with Together AI's OpenAI-compatible API
-to give Caz the ability to think during Phase 1.
+Handles communication with Ollama's local API to give Caz the
+ability to think — entirely on your machine. No data leaves,
+no API keys needed, no subscriptions.
 
-Teaching note: Together AI uses the same API format as OpenAI
-(the "OpenAI-compatible" standard). This means we can swap the
-endpoint URL without changing our code — useful for when we
-switch to local Ollama in Phase 2.
+Teaching note: Ollama exposes an OpenAI-compatible API at
+localhost:11434. This is the same format that Together AI,
+OpenAI, and others use:
 
-The API format (simplified):
     POST /v1/chat/completions
     {
-        "model": "allenai/OLMo-2-...",
+        "model": "olmo2:7b",
         "messages": [{"role": "user", "content": "..."}],
         "temperature": 0.7
     }
 
-We implement this with Python's built-in `http.client` — zero
-external dependencies. No `requests`, no `httpx`, no `openai` SDK.
+Because we used this standard format from the start, switching
+from Together AI (remote) to Ollama (local) required changing
+just the endpoint and removing the API key. This is why
+standards and interfaces matter — swap implementations freely.
+
+We use Python's built-in `http.client` — zero external deps.
 
 Security:
-    - API key comes ONLY from environment variable (CAZ_API_KEY)
-    - Never logged, never written to disk
-    - Connection uses HTTPS (TLS encrypted)
+    - Runs 100% locally (localhost:11434)
+    - No API key needed
+    - No data leaves your machine
+    - No network access required
 """
 
 import http.client
@@ -52,15 +56,15 @@ Warm but precise. Magical but grounded. Bookish but practical."""
 
 class ModelClient:
     """
-    Client for communicating with an OpenAI-compatible API.
+    Client for communicating with Ollama's local API.
 
-    For Phase 1, this connects to Together AI (which hosts OLMo).
-    In Phase 2, the same interface will work with local Ollama.
+    Uses the OpenAI-compatible endpoint so this same client
+    could work with any compatible backend (Ollama, Together AI,
+    vLLM, etc.) by just changing the endpoint.
 
     Teaching note: This is the "Adapter" pattern — it wraps an
     external service behind a consistent interface. When the
-    underlying service changes (remote → local), callers don't
-    need to change their code.
+    underlying service changes, callers don't need to change.
     """
 
     def __init__(self, config: dict):
@@ -68,32 +72,44 @@ class ModelClient:
         Initialize the model client.
 
         Parameters:
-            config: Full Caz config dict. Reads [models.remote]
-                    for endpoint and model name.
+            config: Full Caz config dict. Reads [models] section.
 
-        Environment:
-            CAZ_API_KEY: Required. The Together AI API key.
+        With Ollama: No API key needed. Runs on localhost.
+        With remote: Set CAZ_API_KEY environment variable.
         """
-        remote_config = config.get("models", {}).get("remote", {})
-        self.endpoint = remote_config.get(
-            "endpoint", "api.together.xyz"
-        )
-        self.model = remote_config.get(
-            "model", "allenai/OLMo-2-0325-32B-Instruct"
-        )
-        self.api_key = os.environ.get("CAZ_API_KEY", "")
+        models_config = config.get("models", {})
+        self.provider = models_config.get("provider", "ollama")
+
+        if self.provider == "ollama":
+            self.endpoint = "localhost"
+            self.port = 11434
+            self.model = models_config.get("primary", "olmo2:7b")
+            self.api_key = None
+            self.use_https = False
+        else:
+            # Remote fallback (Together AI, etc.)
+            remote_config = models_config.get("remote", {})
+            self.endpoint = remote_config.get(
+                "endpoint", "api.together.xyz"
+            )
+            self.port = 443
+            self.model = remote_config.get(
+                "model", "allenai/OLMo-2-0325-32B-Instruct"
+            )
+            self.api_key = os.environ.get("CAZ_API_KEY", "")
+            self.use_https = True
+
         self.temperature = 0.7
         self.max_tokens = 1024
 
         # Conversation history for context
-        # Teaching note: LLMs are stateless — they don't remember
-        # previous messages unless you send them again. So we keep
-        # a list and send the full conversation each time.
         self._history: list[dict] = []
 
     @property
     def is_configured(self) -> bool:
-        """Check if the client has a valid API key."""
+        """Check if the client is ready to use."""
+        if self.provider == "ollama":
+            return True  # No key needed for local
         return bool(self.api_key)
 
     def chat(
@@ -179,28 +195,29 @@ class ModelClient:
 
     def _api_call(self, body: dict) -> dict:
         """
-        Make an HTTPS POST to the API endpoint.
+        Make an HTTP POST to the API endpoint.
 
         Teaching note: We use Python's built-in `http.client`
         instead of the `requests` library. It's more verbose
-        but has zero dependencies. The trade-off is worth it
-        for our minimal-deps principle.
+        but has zero dependencies.
 
-        The flow:
-        1. Open HTTPS connection (encrypted)
-        2. Send POST with JSON body
-        3. Read response
-        4. Parse JSON response
-        5. Close connection
+        For Ollama: plain HTTP to localhost (no TLS needed locally)
+        For remote: HTTPS with API key in Authorization header
         """
-        conn = http.client.HTTPSConnection(
-            self.endpoint, timeout=30
-        )
+        if self.use_https:
+            conn = http.client.HTTPSConnection(
+                self.endpoint, port=self.port, timeout=30
+            )
+        else:
+            conn = http.client.HTTPConnection(
+                self.endpoint, port=self.port, timeout=60
+            )
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
         try:
             conn.request(
@@ -221,7 +238,7 @@ class ModelClient:
 
         except (OSError, TimeoutError) as e:
             raise ConnectionError(
-                f"Could not reach {self.endpoint}: {e}"
+                f"Could not reach {self.endpoint}:{self.port}: {e}"
             ) from e
         finally:
             conn.close()

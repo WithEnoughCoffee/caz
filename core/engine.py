@@ -99,17 +99,17 @@ class Engine:
         """
         Send a message to the configured model and return response.
 
-        If no model is configured, returns a helpful message
-        explaining how to set up the API key.
+        If no model is configured (remote without API key),
+        returns a helpful message explaining how to set up.
         """
         if not self.model.is_configured:
             return (
                 "🌱 My mind hasn't fully awakened yet — I need an API key "
                 "to think.\n\n"
                 "Set it with:\n"
-                "  export CAZ_API_KEY='your-together-ai-key'\n\n"
-                "Get a free key at: https://api.together.xyz/settings/api-keys\n\n"
-                "For now, I can show you `help`, `permissions`, or `config`."
+                "  export CAZ_API_KEY='your-api-key'\n\n"
+                "Or switch to local Ollama (free, no key needed):\n"
+                "  Set provider = \"ollama\" in config.toml"
             )
 
         try:
