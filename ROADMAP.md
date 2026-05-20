@@ -12,7 +12,8 @@
 | 1.5 | Remote model (bootstrap) | API design, HTTP clients, streaming |
 | 1.6 | Logging framework | Structured logging, audit trails |
 | 1.7 | Setup script | Shell scripting, dependency management |
-| 1.8 | Push to GitHub | Git workflows, repo hygiene |
+| 1.8 | Security scanning (bandit) | Static analysis, supply chain security |
+| 1.9 | Push to GitHub | Git workflows, repo hygiene |
 
 **End state:** `git clone` → `./setup.sh` → working chat assistant.
 
@@ -63,7 +64,7 @@
 | 5.2 | Bias detection | AI fairness metrics, evaluation |
 | 5.3 | Benchmarking suite | ML evaluation, statistical testing |
 | 5.4 | Alignment testing | AI alignment concepts |
-| 5.5 | Fine-tuning | Model training, LoRA, data curation |
+| 5.5 | LoRA fine-tuning | Model training on consumer hardware, data curation |
 | 5.6 | Remove API dependency | Self-sufficiency |
 
 **End state:** Ethical, benchmarked, fully local, truly yours.

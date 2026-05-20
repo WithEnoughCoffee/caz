@@ -84,8 +84,22 @@ Caz uses **truly open** models only — full transparency into weights, training
 |------|-------|---------|-----|
 | Brain (primary) | OLMo 2 7B | Apache 2.0 | Fully reproducible, AI2 publishes everything |
 | Deep thinking | OLMo 2 13B | Apache 2.0 | Heavier reasoning when needed |
+| Quick tasks | SmolLM 2 | Apache 2.0 | Tiny, energy-efficient, training data fully published |
 | Code (future) | Fine-tuned OLMo or truly open alternative | Apache 2.0 | Code-specialized |
+| Stretch goal | OLMo 2 32B | Apache 2.0 | Near GPT-4o-mini performance, requires 32GB+ RAM |
 | Bootstrap only | API model (temporary) | — | Training wheels, removed in Phase 5 |
+
+### Model Selection Philosophy
+
+The router picks the **lightest model that can handle the job**:
+- Simple questions, quick lookups → SmolLM 2 (fast, minimal power)
+- General chat, teaching, reasoning → OLMo 2 7B (balanced)
+- Complex analysis, deep reasoning → OLMo 2 13B (when needed)
+
+### Resources
+- [AllenAI's Awesome Open Source LLMs](https://github.com/allenai/awesome-open-source-lms) — tracks truly open models
+- [OLMo-core GitHub](https://github.com/allenai/OLMo-core) — training code, checkpoints, data
+- [Vellum Transparency Leaderboard](https://www.vellum.ai/open-llm-leaderboard) — ranks models by openness
 
 ## Getting Started
 
