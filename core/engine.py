@@ -16,6 +16,7 @@ from core.config import load as load_config
 from core.logging import CazLogger
 from core.model_client import ModelClient
 from core.permissions import PermissionManager
+from core.web_search import WebSearch, format_search_results
 
 
 class Engine:
@@ -40,6 +41,9 @@ class Engine:
         self.permissions = PermissionManager(self.config)
         self.logger = CazLogger(self.config)
         self.model = ModelClient(self.config)
+        self.search = WebSearch()
+        self._network_granted = False
+        self._pending_search: Optional[str] = None
         self.teaching_mode = self.config["caz"].get(
             "teaching_mode", True
         )
@@ -91,6 +95,22 @@ class Engine:
             response = "🌿 Memory cleared — fresh conversation, fresh soil."
             self.logger.interaction("caz", response)
             return response
+
+        # Search command: /search <query> or "search for <query>"
+        search_query = self._extract_search_query(message)
+        if search_query:
+            response = self._handle_search(search_query)
+            self.logger.interaction("caz", response)
+            return response
+
+        # "yes" in response to a search suggestion
+        if message.lower() in ("yes", "y", "yeah", "sure", "do it"):
+            if self._pending_search:
+                self.grant_network_permission()
+                response = self._execute_search(self._pending_search)
+                self._pending_search = None
+                self.logger.interaction("caz", response)
+                return response
 
         # Route to model
         return self._ask_model(message)
@@ -155,13 +175,15 @@ class Engine:
         return """
 🌱 Caz — Available Commands
 
-  help         Show this message
-  permissions  View current permission grants
-  config       View active configuration
-  clear        Reset conversation (fresh soil)
-  quit/exit    Leave the greenhouse
+  help             Show this message
+  /search <query>  Search the web (requires permission)
+  permissions      View current permission grants
+  config           View active configuration
+  clear            Reset conversation (fresh soil)
+  quit/exit        Leave the greenhouse
 
-Just type naturally to chat! Caz uses OLMo 2 (truly open, Apache 2.0).
+Just type naturally to chat! Say "search for ..." to look things up.
+Caz uses OLMo 2 (truly open, Apache 2.0) running locally via Ollama.
         """.strip()
 
     def _show_permissions(self) -> str:
@@ -209,4 +231,101 @@ Just type naturally to chat! Caz uses OLMo 2 (truly open, Apache 2.0).
    Guardrails:      {c['ethics']['guardrails_enabled']}
    Admit uncertainty: {c['ethics']['admit_uncertainty']}
    Cite sources:    {c['ethics']['cite_sources']}
+   Network (this session): {'✓ granted' if self._network_granted else '✗ not granted'}
         """.strip()
+
+    # --- Search Methods ---
+
+    def _extract_search_query(self, message: str) -> Optional[str]:
+        """
+        Check if the user is asking to search.
+
+        Recognizes:
+          /search python asyncio
+          search for python asyncio
+          look up python asyncio
+          google python asyncio
+        """
+        lower = message.lower().strip()
+
+        # /search command
+        if lower.startswith("/search "):
+            return message[8:].strip()
+
+        # Natural language triggers
+        prefixes = [
+            "search for ",
+            "search ",
+            "look up ",
+            "google ",
+            "find me info on ",
+            "find info on ",
+        ]
+        for prefix in prefixes:
+            if lower.startswith(prefix):
+                return message[len(prefix):].strip()
+
+        return None
+
+    def _handle_search(self, query: str) -> str:
+        """
+        Execute a web search with permission checking.
+
+        Flow:
+        1. Check if network permission is granted this session
+        2. If not → return a permission request (user must confirm)
+        3. If yes → search, format results, log the action
+        """
+        if not self._network_granted:
+            # Store the pending search so we can execute after "yes"
+            self._pending_search = query
+            self.logger.audit(
+                "network_permission_requested",
+                reason="web_search",
+                query=query,
+            )
+            return (
+                f"🔐 I'd like to search the web for: \"{query}\"\n\n"
+                "This requires network access (currently denied by default).\n"
+                "Grant network permission for this session?\n\n"
+                "  Type 'yes' to allow  |  anything else to deny"
+            )
+
+        # Permission granted — execute search
+        return self._execute_search(query)
+
+    def _execute_search(self, query: str) -> str:
+        """Actually perform the search and return formatted results."""
+        self.logger.audit(
+            "web_search_executed",
+            query=query,
+        )
+        self.logger.system(
+            "Executing web search",
+            query=query,
+        )
+
+        try:
+            results = self.search.query(query)
+            formatted = format_search_results(results)
+            self.logger.system(
+                "Search completed",
+                query=query,
+                result_count=len(results),
+            )
+            return formatted
+
+        except ConnectionError as e:
+            self.logger.error("Search failed", error=str(e))
+            return f"🌧️ Search failed: {e}"
+        except ValueError as e:
+            return f"🌧️ Invalid search: {e}"
+
+    def grant_network_permission(self) -> str:
+        """Grant network access for this session."""
+        self._network_granted = True
+        self.logger.audit(
+            "network_permission_granted",
+            scope="session",
+        )
+        return "✓ Network access granted for this session."
