@@ -1,0 +1,43 @@
+# Caz Configuration
+# This file controls Caz's behavior. Edit by hand anytime.
+# Secrets (API keys) MUST go in environment variables, never here.
+
+[caz]
+name = "Caz"
+teaching_mode = true        # Always explain reasoning by default
+log_level = "info"          # debug | info | warn | error
+
+[models]
+primary = "olmo2:7b"       # Default brain — lightweight, fast
+heavy = "olmo2:13b"        # For complex reasoning tasks
+provider = "ollama"         # "ollama" for local, "remote" for bootstrap
+energy_mode = "efficient"   # efficient | balanced | performance
+
+[models.remote]
+# Temporary bootstrap only — will be removed in Phase 5
+# API key MUST be set via environment variable CAZ_API_KEY
+endpoint = ""
+model = ""
+
+[memory]
+enabled = true
+db_path = "data/memory.db"
+max_conversations = 1000    # Oldest auto-archived after this
+
+[permissions]
+# DENY BY DEFAULT. Only what's listed here is pre-approved.
+# Anything else triggers a per-session prompt to the user.
+allow_network = false
+allow_file_read = []        # Pre-approved directories, e.g. ["~/notes"]
+allow_file_write = []       # Pre-approved write directories
+allow_shell = false         # Shell command execution
+
+[logging]
+directory = "logs"
+audit_enabled = true        # Log every action for transparency
+retain_days = 90
+
+[ethics]
+guardrails_enabled = true
+admit_uncertainty = true    # Say "I don't know" when unsure
+cite_sources = true         # Always try to provide sources
