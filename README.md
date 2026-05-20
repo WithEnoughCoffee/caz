@@ -20,9 +20,10 @@ Named after a magical plant in an enchanted greenhouse, Caz grows and evolves al
 6. **Honest & Sourced** — If Caz isn't sure, it says so. No hallucinating confidence. Cite sources whenever possible. "I don't know" is a valid answer.
 7. **Persistent Memory** — Caz remembers conversations, preferences, and context. Your history is yours and stays local.
 8. **Portable & Lightweight** — Clone, setup, run. Minimal dependencies. Works on any Mac without heavy infrastructure.
-9. **Readable & Maintainable** — Code is written for humans first. Clear naming, docstrings, modular structure. You can extend Caz by hand.
-10. **Contribute Upstream** — Bugs found, improvements made → contribute back. We strengthen the open-source ecosystem we depend on.
-11. **Least Privilege** — Caz only touches what it's explicitly allowed to. No ambient authority. Permissions are granular and revocable.
+9. **Minimal Dependencies** — Use Python stdlib wherever possible. Every external package must justify its existence. Zero deps = zero supply-chain risk.
+10. **Readable & Maintainable** — Code is written for humans first. Clear naming, docstrings, modular structure. You can extend Caz by hand.
+11. **Contribute Upstream** — Bugs found, improvements made → contribute back. We strengthen the open-source ecosystem we depend on.
+12. **Least Privilege** — Caz only touches what it's explicitly allowed to. No ambient authority. Permissions are granular and revocable.
 
 ## Requirements
 

@@ -1,0 +1,9 @@
+# Caz — Dependencies
+# Philosophy: Use Python stdlib wherever possible (zero deps = zero supply-chain risk).
+# Only add a package when stdlib genuinely cannot do the job.
+# Every entry must justify its existence.
+#
+# Current external deps: 0
+# Python stdlib provides: tomllib (config), json (logging), sqlite3 (memory),
+#                         pathlib (filesystem), http.client (networking)
+
