@@ -19,6 +19,21 @@ from core.permissions import PermissionManager
 from core.web_search import WebSearch, format_search_results
 
 
+# System prompt for synthesizing search results
+SEARCH_SYNTHESIS_PROMPT = """You are Caz, a knowledgeable AI assistant in an enchanted greenhouse. \
+You've just searched the web for the user. Your job is to:
+
+1. Synthesize the search results into a clear, conversational answer
+2. Cite sources using [1], [2], etc. matching the numbered results
+3. Be honest — if the results don't fully answer the question, say so
+4. Keep your tone warm, bookish, and slightly whimsical
+5. Be concise — summarize, don't just repeat the snippets verbatim
+6. If results conflict, note the disagreement
+
+Never make up information that isn't in the search results. \
+If you're unsure, say "Based on what I found..." rather than stating as absolute fact."""
+
+
 class Engine:
     """
     Central orchestrator for Caz.
@@ -295,7 +310,21 @@ Caz uses OLMo 2 (truly open, Apache 2.0) running locally via Ollama.
         return self._execute_search(query)
 
     def _execute_search(self, query: str) -> str:
-        """Actually perform the search and return formatted results."""
+        """
+        Search the web and synthesize results through the model.
+
+        Flow:
+        1. Search DuckDuckGo for raw results
+        2. Feed results into OLMo as context
+        3. OLMo generates a conversational answer with citations
+        4. Return the synthesized response
+
+        Teaching note: This is "Retrieval-Augmented Generation" (RAG)
+        in its simplest form. Instead of the model hallucinating facts,
+        we give it real search results and ask it to synthesize an
+        answer from them. The model's job becomes summarization and
+        explanation — things it's good at — rather than fact recall.
+        """
         self.logger.audit(
             "web_search_executed",
             query=query,
@@ -307,19 +336,79 @@ Caz uses OLMo 2 (truly open, Apache 2.0) running locally via Ollama.
 
         try:
             results = self.search.query(query)
-            formatted = format_search_results(results)
             self.logger.system(
                 "Search completed",
                 query=query,
                 result_count=len(results),
             )
-            return formatted
+
+            if not results:
+                return "🔍 I searched but found no results. Try rephrasing?"
+
+            # Build context from search results for the model
+            context = self._build_search_context(query, results)
+
+            # Ask the model to synthesize an answer
+            try:
+                synthesis = self.model.chat(
+                    context,
+                    system_prompt=SEARCH_SYNTHESIS_PROMPT,
+                )
+                response = synthesis["content"]
+
+                # Append source list so user can verify
+                source_list = "\n\n📚 Sources:\n"
+                for i, r in enumerate(results, 1):
+                    source_list += f"  [{i}] {r.url}\n"
+                source_list += "\n  ⚠️  Verify claims against sources — I may misinterpret."
+
+                full_response = response + source_list
+
+                self.logger.interaction(
+                    "caz",
+                    full_response,
+                    model=synthesis.get("model"),
+                    tokens=synthesis.get("tokens"),
+                    duration_ms=synthesis.get("duration_ms"),
+                )
+                return full_response
+
+            except ConnectionError:
+                # Model unavailable — fall back to raw results
+                formatted = format_search_results(results)
+                return formatted
 
         except ConnectionError as e:
             self.logger.error("Search failed", error=str(e))
             return f"🌧️ Search failed: {e}"
         except ValueError as e:
             return f"🌧️ Invalid search: {e}"
+
+    def _build_search_context(self, query: str, results: list) -> str:
+        """
+        Format search results as context for the model.
+
+        Teaching note: How you format context for a model matters.
+        Clear structure helps the model understand what's a source
+        vs what's the question. We number sources so the model
+        can reference them as [1], [2], etc.
+        """
+        context = f"The user asked: \"{query}\"\n\n"
+        context += "Here are search results from the web:\n\n"
+
+        for i, r in enumerate(results, 1):
+            context += f"[{i}] {r.title}\n"
+            context += f"    URL: {r.url}\n"
+            if r.snippet:
+                context += f"    Content: {r.snippet}\n"
+            context += "\n"
+
+        context += (
+            "Based on these search results, provide a helpful answer. "
+            "Cite sources using [1], [2], etc. "
+            "If the results don't fully answer the question, say so."
+        )
+        return context
 
     def grant_network_permission(self) -> str:
         """Grant network access for this session."""
