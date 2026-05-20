@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Caz local data (stays on your machine)
+data/
+logs/
+
+# Environment & secrets
+.env
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
