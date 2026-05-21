@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from core.config import load as load_config
+from core.guardrails import check_guardrails, GUARDRAIL_SYSTEM_PROMPT_ADDITION
 from core.logging import CazLogger
 from core.model_client import ModelClient
 from core.permissions import PermissionManager
@@ -87,6 +88,16 @@ class Engine:
         """
         # Log user message
         self.logger.interaction("user", message)
+
+        # GUARDRAILS — first line of defense, before anything else
+        guardrail_result = check_guardrails(message)
+        if guardrail_result.flagged:
+            self.logger.audit(
+                "guardrail_triggered",
+                violation_type=guardrail_result.violation_type.value,
+            )
+            self.logger.interaction("caz", guardrail_result.response)
+            return guardrail_result.response
 
         # Built-in commands (don't need a model)
         if message.lower() in ("quit", "exit", "bye"):
