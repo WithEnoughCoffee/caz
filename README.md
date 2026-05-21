@@ -88,7 +88,6 @@ Caz uses **truly open** models only — full transparency into weights, training
 | Quick tasks | SmolLM 2 | Apache 2.0 | Tiny, energy-efficient, training data fully published |
 | Code (future) | Fine-tuned OLMo or truly open alternative | Apache 2.0 | Code-specialized |
 | Stretch goal | OLMo 2 32B | Apache 2.0 | Near GPT-4o-mini performance, requires 32GB+ RAM |
-| Bootstrap only | API model (temporary) | — | Training wheels, removed in Phase 5 |
 
 ### Model Selection Philosophy
 
@@ -105,12 +104,70 @@ The router picks the **lightest model that can handle the job**:
 ## Getting Started
 
 ```bash
-git clone git@github.com:WithEnoughCoffee/caz.git
+git clone https://github.com/WithEnoughCoffee/caz.git
 cd caz
-./setup.sh
+brew install ollama          # Local model runtime
+brew services start ollama   # Start the service
+ollama pull olmo2:7b         # Download the brain (~4.5GB)
+python3 caz.py               # Talk to Caz
 ```
 
-> ⚠️ Caz is in early development (Phase 1). See ROADMAP.md for progress.
+> ⚠️ Requires: macOS with Apple Silicon, Python 3.11+, ~8GB free disk space.
+
+## Features (What Works Today)
+
+### 💬 Local AI Chat
+Chat with OLMo 2 7B running entirely on your machine via Ollama. No cloud, no API keys, no subscriptions. Your conversations never leave your computer.
+
+### 🔍 Web Search with RAG
+Say `/search <query>` or `search for ...` — Caz searches DuckDuckGo, synthesizes a conversational answer from the results, and cites sources with clickable links. Always asks permission before going online.
+
+### 🧠 Context-Aware Search
+If you're discussing a topic and say "search for that", Caz pulls context from your recent messages to build a smarter query. Vague searches get enriched automatically.
+
+### ⏱️ Real-Time Detection
+Ask about weather, news, prices, or anything time-sensitive — Caz recognizes it can't know this from training data and proactively offers to search instead of guessing.
+
+### 🚫 Ethical Guardrails
+Two-layer defense against harmful content (racism, sexism, ageism, homophobia, transphobia, ableism, harassment). Direct and blunt boundary-setting. Runs pre-model for speed + in-model for subtle cases. Zero false positives on normal tech conversation.
+
+### 🎭 Persona Customization
+Name your assistant after your favorite book character and define its personality in `config.toml`:
+```toml
+[persona]
+name = "Gandalf"
+character = "a wise wizard with deep knowledge of lore and code"
+traits = ["speaks with gravitas", "occasionally cryptic but helpful"]
+```
+Core behaviors (honesty, ethics, security) are non-negotiable regardless of persona.
+
+### 🔐 Permission System
+Deny-by-default, session-scoped. Caz asks before accessing files, network, or shell. Grants expire when you exit. Path traversal attacks blocked. Full audit trail.
+
+### 📋 Structured Logging
+Three JSONL log files (interactions, audit, system) for full transparency. See exactly what Caz did, when, and why. Zero external dependencies.
+
+### ⚙️ Layered Configuration
+TOML config with layered overrides: defaults → config.toml → env vars → CLI flags. API keys only in environment variables (never on disk).
+
+### 🪶 Zero External Dependencies
+The entire core framework runs on Python stdlib only. No pip install required for the base system. Ollama is the only external tool (for running the model).
+
+## Architecture
+
+```
+caz.py              → CLI entry point (I/O only)
+core/
+  engine.py         → Orchestrator (routes messages)
+  model_client.py   → Ollama/API communication (stdlib http.client)
+  config.py         → Layered TOML configuration
+  permissions.py    → Session-scoped least-privilege system
+  logging.py        → Structured JSONL logging
+  web_search.py     → DuckDuckGo search with input hardening
+  guardrails.py     → Ethical content filtering
+config.toml         → User-editable settings
+tests/              → Full test suite
+```
 
 ## Contributing
 
