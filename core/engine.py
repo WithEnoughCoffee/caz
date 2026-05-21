@@ -129,6 +129,12 @@ class Engine:
                 self.logger.interaction("caz", response)
                 return response
 
+        # Check if this needs real-time info (suggest search)
+        if self._needs_realtime_data(message):
+            response = self._suggest_search(message)
+            self.logger.interaction("caz", response)
+            return response
+
         # Route to model
         return self._ask_model(message)
 
@@ -250,6 +256,45 @@ Caz uses OLMo 2 (truly open, Apache 2.0) running locally via Ollama.
    Cite sources:    {c['ethics']['cite_sources']}
    Network (this session): {'✓ granted' if self._network_granted else '✗ not granted'}
         """.strip()
+
+    # --- Real-time Detection ---
+
+    def _needs_realtime_data(self, message: str) -> bool:
+        """
+        Detect if a message is asking about something that requires
+        current/real-time information Caz can't know from training.
+
+        Teaching note: LLMs have a "knowledge cutoff" — they only
+        know things up to their training date. Anything that changes
+        (weather, news, prices, scores) needs a live search.
+        """
+        lower = message.lower()
+
+        # Time-sensitive keywords
+        realtime_signals = [
+            "current ", "right now", "today",
+            "weather", "forecast",
+            "latest ", "recent ",
+            "stock price", "score",
+            "happening now", "breaking",
+            "this week", "this month",
+            "news about",
+        ]
+
+        return any(signal in lower for signal in realtime_signals)
+
+    def _suggest_search(self, message: str) -> str:
+        """
+        Suggest a web search when the question needs real-time data.
+        Stores the message as a pending search for if user says yes.
+        """
+        self._pending_search = message
+        return (
+            "🌱 That sounds like something that needs live data — "
+            "I don't want to guess and get it wrong.\n\n"
+            "Want me to search the web for this? 🔍\n\n"
+            "  Type 'yes' to search  |  anything else to skip"
+        )
 
     # --- Search Methods ---
 
