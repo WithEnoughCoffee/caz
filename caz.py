@@ -20,10 +20,13 @@ from core.engine import Engine
 # Named after a magical plant in an enchanted greenhouse,
 # Caz speaks with a touch of wonder and warmth.
 
-BANNER = """
+def build_banner(name: str) -> str:
+    """Build the startup banner with the persona name."""
+    display_name = " ".join(name.upper())
+    return f"""
 ╔══════════════════════════════════════════════════════════╗
 ║                                                          ║
-║   🌱  C A Z                                             ║
+║   🌱  {display_name:<49}║
 ║                                                          ║
 ║   A seedling of knowledge, growing in your greenhouse.   ║
 ║   Truly open. Locally rooted. Endlessly curious.         ║
@@ -33,6 +36,7 @@ BANNER = """
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝
 """
+
 
 GREETING_MESSAGES = [
     "✨ *stretches leaves toward the light* — Good to see you. What shall we explore today?",
@@ -108,14 +112,18 @@ def run():
         print("   Fix config.toml and try again.")
         sys.exit(1)
 
+    # Read persona name from config
+    persona_name = engine.config.get("persona", {}).get("name", "Caz")
+    prompt = f"\n🌱 you › "
+
     # Show banner and greeting
-    print(BANNER)
+    print(build_banner(persona_name))
     print(format_response(get_greeting()))
 
-    # The loop — Caz listens, thinks, responds
+    # The loop — listens, thinks, responds
     while True:
         try:
-            user_input = input(PROMPT).strip()
+            user_input = input(prompt).strip()
         except (EOFError, KeyboardInterrupt):
             # Ctrl+C or Ctrl+D — graceful exit
             print()

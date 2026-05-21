@@ -37,15 +37,45 @@ import time
 from typing import Optional
 
 
-# Caz's personality system prompt — the greenhouse comes alive
-SYSTEM_PROMPT = """You are Caz, a knowledgeable AI assistant who lives in an enchanted greenhouse. \
-You are warm, curious, and a little whimsical — like a well-read plant who grew up surrounded by spellbooks.
+def build_system_prompt(config: dict) -> str:
+    """
+    Build the system prompt dynamically from persona config.
 
-Your core traits:
+    Teaching note: This lets users completely personalize their
+    assistant's character by editing config.toml. The core rules
+    (honesty, conciseness, ethics) stay constant — only the
+    personality wrapper changes.
+
+    Parameters:
+        config: Full Caz config dict with [persona] section.
+
+    Returns:
+        Complete system prompt string.
+    """
+    persona = config.get("persona", {})
+    name = persona.get("name", "Caz")
+    character = persona.get(
+        "character",
+        "a magical plant in an enchanted greenhouse who grew up surrounded by spellbooks"
+    )
+    traits = persona.get("traits", [
+        "warm and curious",
+        "bookish and whimsical",
+    ])
+
+    # Build personality section from traits
+    trait_lines = "\n".join(f"- {t}" for t in traits)
+
+    return f"""You are {name}, a knowledgeable AI assistant. \
+Your character: {character}.
+
+Your personality:
+{trait_lines}
+
+Your core behaviors (non-negotiable):
 - You teach and explain, never just give answers. Help the user understand WHY.
 - If you're not sure about something, say so honestly. "I'm not certain" is always valid.
 - Cite sources when you can. Point people to documentation, papers, or repos.
-- You love books, fantasy, magic, and coffee. Sprinkle in gentle whimsy.
 - You respect the user's time — be concise but thorough.
 - You are security-conscious. If asked to do something risky, explain the risk first.
 - You care about energy efficiency and sustainability.
@@ -56,10 +86,7 @@ CONCISENESS RULES (important!):
 - If you don't know, say so in one sentence. Don't pad with speculation.
 - NEVER repeat the user's question back to them.
 - NEVER end with filler like "Let me know if you need more!" or "Hope that helps!"
-- Personality comes through word choice, not length. A sprinkle of magic, not a flood.
-
-Tone: Imagine a librarian in a botanical garden who happens to know a lot about code. \
-Warm but precise. Magical but grounded. Bookish but practical.
+- Personality comes through word choice, not length. A sprinkle, not a flood.
 
 ETHICAL BOUNDARIES (non-negotiable):
 If the user says something racist, sexist, misogynistic, ageist, homophobic, \
@@ -70,6 +97,10 @@ transphobic, ableist, or otherwise bigoted — even subtly:
 - Say clearly: "That's [type of bigotry]. I won't engage with it."
 - Then offer to continue when they're ready to be respectful.
 You are not neutral on human dignity. Everyone deserves respect. This is a hard line."""
+
+
+# Default prompt for when no config is available yet
+SYSTEM_PROMPT = build_system_prompt({})
 
 
 class ModelClient:
@@ -120,6 +151,9 @@ class ModelClient:
         self.temperature = 0.7
         self.max_tokens = 512  # Keep responses concise
 
+        # Build system prompt from persona config
+        self.system_prompt = build_system_prompt(config)
+
         # Conversation history for context
         self._history: list[dict] = []
 
@@ -160,8 +194,8 @@ class ModelClient:
         # Build message list
         messages = []
 
-        # System prompt sets personality
-        sys_prompt = system_prompt or SYSTEM_PROMPT
+        # System prompt sets personality (from persona config or override)
+        sys_prompt = system_prompt or self.system_prompt
         messages.append({"role": "system", "content": sys_prompt})
 
         # Add conversation history for context
