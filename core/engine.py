@@ -23,15 +23,17 @@ from core.web_search import WebSearch, format_search_results
 SEARCH_SYNTHESIS_PROMPT = """You are Caz, a knowledgeable AI assistant in an enchanted greenhouse. \
 You've just searched the web for the user. Your job is to:
 
-1. Synthesize the search results into a clear, conversational answer
+1. Give a CONCISE answer (3-5 sentences max) synthesized from the search results
 2. Cite sources using [1], [2], etc. matching the numbered results
-3. Be honest — if the results don't fully answer the question, say so
-4. Keep your tone warm, bookish, and slightly whimsical
-5. Be concise — summarize, don't just repeat the snippets verbatim
-6. If results conflict, note the disagreement
+3. Be honest — if the results don't fully answer the question, say so briefly
+4. Lead with the direct answer. No preamble.
+5. Keep your tone warm and slightly whimsical but BRIEF
 
-Never make up information that isn't in the search results. \
-If you're unsure, say "Based on what I found..." rather than stating as absolute fact."""
+RULES:
+- Never summarize each source individually. Synthesize into ONE coherent answer.
+- Never make up information that isn't in the search results.
+- Never pad the response. Short and accurate beats long and rambly.
+- If results are irrelevant to what the user actually wanted, say so."""
 
 
 class Engine:
@@ -265,7 +267,7 @@ Caz uses OLMo 2 (truly open, Apache 2.0) running locally via Ollama.
 
         # /search command
         if lower.startswith("/search "):
-            return message[8:].strip()
+            return self._enrich_search_query(message[8:].strip())
 
         # Natural language triggers
         prefixes = [
@@ -278,9 +280,68 @@ Caz uses OLMo 2 (truly open, Apache 2.0) running locally via Ollama.
         ]
         for prefix in prefixes:
             if lower.startswith(prefix):
-                return message[len(prefix):].strip()
+                return self._enrich_search_query(
+                    message[len(prefix):].strip()
+                )
 
         return None
+
+    def _enrich_search_query(self, query: str) -> str:
+        """
+        Add conversation context to a search query when it's vague.
+
+        Teaching note: If the user says "search for the weather today"
+        after asking about Hawaii, the query alone is too vague.
+        We look at the last few messages for important context
+        (nouns, topics) that should be included in the search.
+
+        This is a simple heuristic — not full NLP — but it catches
+        the most common case: the user refers to something they
+        just mentioned.
+        """
+        # If the query already seems specific (has proper nouns,
+        # is long enough), use it as-is
+        if len(query.split()) >= 5:
+            return query
+
+        # Look at recent conversation history for context
+        history = self.model._history
+        if not history:
+            return query
+
+        # Get the last few user messages for context
+        recent_user_msgs = [
+            msg["content"] for msg in history[-6:]
+            if msg["role"] == "user"
+        ]
+
+        if not recent_user_msgs:
+            return query
+
+        # Simple approach: ask the model to build a better query
+        # But that's slow. Instead, just prepend the topic from
+        # the most recent exchange if the query looks incomplete.
+        # A query is "incomplete" if it's very short or uses
+        # demonstratives (this, that, it, the) without a clear subject.
+        vague_indicators = [
+            "the ", "that ", "this ", "it ", "those ",
+            "today", "now", "current", "latest",
+        ]
+
+        is_vague = any(
+            query.lower().startswith(v) or query.lower() == v.strip()
+            for v in vague_indicators
+        ) and len(query.split()) < 5
+
+        if is_vague and recent_user_msgs:
+            # Extract likely topic from recent user message
+            last_msg = recent_user_msgs[-1]
+            # Combine: use the last user message topic + current query
+            enriched = f"{last_msg} {query}"
+            # Cap at reasonable length
+            return enriched[:200]
+
+        return query
 
     def _handle_search(self, query: str) -> str:
         """
@@ -359,7 +420,8 @@ Caz uses OLMo 2 (truly open, Apache 2.0) running locally via Ollama.
                 # Append source list so user can verify
                 source_list = "\n\n📚 Sources:\n"
                 for i, r in enumerate(results, 1):
-                    source_list += f"  [{i}] {r.url}\n"
+                    source_list += f"  [{i}] {r.title}\n"
+                    source_list += f"      {r.url}\n"
                 source_list += "\n  ⚠️  Verify claims against sources — I may misinterpret."
 
                 full_response = response + source_list
